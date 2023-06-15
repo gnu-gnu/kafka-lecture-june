@@ -1,0 +1,73 @@
+version: "2"
+
+services:
+  kafka:
+    container_name: kafka
+    image: docker.io/bitnami/kafka:3.4
+    ports:
+      - "9092:9092"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://123.41.0.100:9092
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sds-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 123.41.0.100:9092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+  akhq:
+    container_name: akhq
+    image: tchiotludo/akhq
+    ports:
+      - 8081:8080
+    depends_on:
+      - kafka
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            sds-kafka:
+              properties:
+                bootstrap.servers: "123.41.0.100:9092"
+  kafka-rest:
+    image: confluentinc/cp-kafka-rest:7.4.0
+    container_name: kafka-rest-proxy
+    ports:
+      - 8082:8082
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_REST_HOST_NAME: 123.41.0.100:8082
+      KAFKA_REST_LISTENERS: 'http://0.0.0.0:8082'
+      KAFKA_REST_BOOTSTRAP_SERVERS: '123.41.0.100:9092'
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.28.2
+    hostname: ksqldb-server
+    container_name: ksqldb-server
+    depends_on:
+      - kafka
+    environment:
+      KSQL_CONFIG_DIR: "/etc/ksql"
+      KSQL_BOOTSTRAP_SERVERS: "123.41.0.100:9092"
+      KSQL_HOST_NAME: ksqldb-server
+      KSQL_LISTENERS: "http://0.0.0.0:8088"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 1
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
+  ksqldb-cli:
+    image: confluentinc/ksqldb-server:0.28.2
+    container_name: ksqldb-cli
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
+volumes:
+  kafka_data:
+    driver: local
